@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Issues</title>
+  <script src="gjuice.config.js"></script>
+  <script src="issues.js"></script>
+  <script>
+    var _cfg = (typeof GJUICE_CONFIG !== 'undefined') ? GJUICE_CONFIG : {};
+    var _projectName = _cfg.projectName || '';
+    document.addEventListener('DOMContentLoaded', function() {
+      if (_projectName) {
+        document.title = _projectName + ' — Issues';
+      }
+    });
+  </script>
+  <style>
+    :root {
+      --bg: #ffffff; --bg-alt: #f5f5f7; --bg-card: #ffffff;
+      --border: #e0e0e0; --text: #1a1a1a; --text-muted: #6b7280;
+      --accent: #6366f1; --shadow: rgba(0,0,0,0.08);
+      --row-hover: #f0f0ff; --desc-bg: #f9f9fb;
+      --area-bg: #f1f5f9; --area-fg: #475569;
+      --mark-bg: #fef08a; --mark-fg: #713f12;
+      --recent-dot: #22c55e;
+      --toast-bg: #1a1a2e; --toast-fg: #e8e8f0;
+      --modal-overlay: rgba(0,0,0,0.4);
+      --modal-bg: #ffffff;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f0f13; --bg-alt: #17171d; --bg-card: #1c1c23;
+        --border: #2e2e3a; --text: #e8e8f0; --text-muted: #b4b4cc;
+        --accent: #818cf8; --shadow: rgba(0,0,0,0.4);
+        --row-hover: #1e1e2e; --desc-bg: #14141a;
+        --area-bg: #1e2433; --area-fg: #94a3b8;
+        --mark-bg: #713f12; --mark-fg: #fef08a;
+        --recent-dot: #4ade80;
+        --toast-bg: #e8e8f0; --toast-fg: #1a1a2e;
+        --modal-overlay: rgba(0,0,0,0.7);
+        --modal-bg: #1c1c23;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; min-height: 100vh; }
+
+    /* HEADER */
+    header { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 4px var(--shadow); flex-wrap: wrap; }
+    header h1 { font-size: 17px; font-weight: 700; white-space: nowrap; }
+    header h1 #project-name-heading { color: var(--text); }
+    header h1 .issues-label { color: var(--accent); }
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+    #search { flex: 1; min-width: 120px; }
+    input[type="search"], input[type="number"], select { background: var(--bg-alt); border: 1px solid var(--border); color: var(--text); padding: 5px 10px; border-radius: 7px; font-size: 13px; outline: none; transition: border-color 0.15s; }
+    input[type="search"]:focus, input[type="number"]:focus, select:focus { border-color: var(--accent); }
+    #filterId { width: 5em; -moz-appearance: textfield; }
+    #filterId::-webkit-outer-spin-button, #filterId::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .regex-toggle { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-dim); cursor: pointer; user-select: none; }
+    .regex-toggle input { cursor: pointer; accent-color: var(--accent); }
+    .regex-toggle span { font-family: monospace; font-size: 13px; }
+    #regexToggle:checked ~ span { color: var(--accent); }
+    select { cursor: pointer; }
+    select option { background: var(--bg-card); }
+    .shortcut-hint { font-size: 11px; color: var(--text-muted); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
+
+    /* SUMMARY STRIP */
+    .summary-strip { background: var(--bg-alt); border-bottom: 1px solid var(--border); padding: 6px 24px; display: flex; gap: 20px; font-size: 12px; color: var(--text-muted); }
+    .summary-strip b { color: var(--text); }
+
+    /* FILTER DROPDOWNS */
+    .fd-wrap { position: relative; }
+    .fd-btn {
+      background: var(--bg-alt); border: 1px solid var(--border); color: var(--text);
+      padding: 5px 10px; border-radius: 7px; font-size: 13px; cursor: pointer;
+      display: flex; align-items: center; gap: 5px; white-space: nowrap;
+      transition: border-color 0.15s;
+    }
+    .fd-btn:hover, .fd-wrap.open .fd-btn { border-color: var(--accent); color: var(--accent); }
+    .fd-btn .fd-arrow { font-size: 9px; opacity: 0.6; }
+    .fd-btn .fd-active { background: var(--accent); color: #fff; border-radius: 10px; font-size: 11px; padding: 0 5px; font-weight: 600; }
+    .fd-menu {
+      position: absolute; top: calc(100% + 5px); left: 0;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 9px;
+      padding: 6px; min-width: 160px; z-index: 300; display: none;
+      box-shadow: 0 6px 20px var(--shadow);
+    }
+    .fd-wrap.open .fd-menu { display: block; }
+    .fd-menu label {
+      display: flex; align-items: center; gap: 8px; padding: 6px 9px;
+      border-radius: 6px; cursor: pointer; font-size: 13px; white-space: nowrap;
+    }
+    .fd-menu label:hover { background: var(--row-hover); }
+    .fd-menu input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer; }
+    .fd-divider { height: 1px; background: var(--border); margin: 4px 0; }
+    .fd-clear { width: 100%; text-align: left; background: none; border: none; color: var(--text-muted); font-size: 12px; padding: 4px 9px; cursor: pointer; border-radius: 5px; }
+    .fd-clear:hover { color: var(--accent); background: var(--row-hover); }
+    .btn-help { background: none; border: 1px solid var(--border); color: var(--text-muted); border-radius: 50%; width: 26px; height: 26px; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: border-color 0.15s, color 0.15s; }
+    .btn-help:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* TABLE */
+    .table-wrap { padding: 20px 24px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; background: var(--bg-card); border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px var(--shadow); border: 1px solid var(--border); }
+    thead tr { background: var(--bg-alt); border-bottom: 1px solid var(--border); }
+    th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); cursor: pointer; user-select: none; white-space: nowrap; }
+    th:hover { color: var(--accent); }
+    th .sort-icon { display: inline-block; margin-left: 3px; opacity: 0.4; font-size: 10px; }
+    th.sorted .sort-icon { opacity: 1; color: var(--accent); }
+    td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr.data-row { cursor: pointer; transition: background 0.1s; }
+    tr.data-row:hover td { background: var(--row-hover); }
+    tr.data-row.expanded td { background: var(--row-hover); }
+
+    /* DIVIDER ROW */
+
+
+    /* DESCRIPTION ROW */
+    tr.desc-row td { padding: 0; border-bottom: 1px solid var(--border); }
+    .desc-content { background: var(--desc-bg); padding: 12px 18px 12px 44px; font-size: 13px; color: var(--text-muted); white-space: pre-wrap; line-height: 1.7; display: none; }
+    tr.desc-row.open .desc-content { display: block; }
+    .solution-block { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+    .solution-label { font-size: 11px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .desc-meta { font-size: 11px; color: var(--text-muted); margin-top: 8px; display: flex; gap: 16px; flex-wrap: wrap; }
+    .desc-meta span { opacity: 0.7; }
+
+    /* BADGES */
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+    .badge-type-unknown { background: var(--bg-alt); color: var(--text-muted); }
+    .area-tag { display: inline-block; padding: 2px 7px; border-radius: 5px; font-size: 11px; background: var(--area-bg); color: var(--area-fg); font-weight: 500; }
+
+    /* ID CELL */
+    .id-cell { font-size: 12px; font-weight: 600; color: var(--text-muted); cursor: copy; user-select: none; transition: color 0.1s; }
+    .id-cell:hover { color: var(--accent); }
+
+    /* EXPAND ICON */
+    .expand-icon { display: inline-block; width: 14px; color: var(--text-muted); font-size: 10px; transition: transform 0.15s; }
+    tr.expanded .expand-icon { transform: rotate(90deg); }
+    .no-expand { color: var(--border); width: 14px; display: inline-block; text-align: center; }
+
+    /* RECENT DOT */
+    .recent-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--recent-dot); margin-right: 5px; vertical-align: middle; }
+
+    /* TITLE */
+    .title-cell { font-weight: 500; max-width: 400px; }
+    mark { background: var(--mark-bg); color: var(--mark-fg); border-radius: 2px; padding: 0 1px; }
+
+    /* EMPTY STATE */
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+    .empty-state div { font-size: 32px; margin-bottom: 10px; }
+
+    /* TOAST */
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(60px); background: var(--toast-bg); color: var(--toast-fg); padding: 8px 18px; border-radius: 20px; font-size: 13px; opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; z-index: 1000; white-space: nowrap; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* MODAL */
+    .modal-overlay { position: fixed; inset: 0; background: var(--modal-overlay); z-index: 200; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal { background: var(--modal-bg); border: 1px solid var(--border); border-radius: 12px; padding: 28px 32px; max-width: 480px; width: 90%; box-shadow: 0 8px 32px var(--shadow); }
+    .modal h2 { font-size: 16px; margin-bottom: 18px; color: var(--text); }
+    .modal table { box-shadow: none; border: none; border-radius: 0; background: none; }
+    .modal td, .modal th { padding: 6px 10px; font-size: 13px; border-bottom: 1px solid var(--border); }
+    .modal thead tr { background: none; }
+    .modal tr:last-child td { border-bottom: none; }
+    .modal .kbd { font-family: monospace; background: var(--bg-alt); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-size: 12px; }
+    .modal-close { margin-top: 20px; display: block; width: 100%; padding: 8px; background: var(--accent); color: #fff; border: none; border-radius: 7px; cursor: pointer; font-size: 14px; font-weight: 600; }
+    .modal-close:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1><a href="index.html" style="text-decoration:none;color:inherit;"><span id="project-name-heading"></span> <span class="issues-label">Issues</span></a></h1>
+  <input type="search" id="search" placeholder="Search issues…" oninput="render()">
+  <label class="regex-toggle" title="Enable regular expression search"><input type="checkbox" id="regexToggle" onchange="render()"> <span>.*</span></label>
+  <div class="controls">
+    <input type="number" id="filterId" placeholder="ID" min="1" oninput="render()" title="Filter by issue ID">
+
+    <div class="fd-wrap" id="fd-status">
+      <button class="fd-btn" onclick="toggleFd('fd-status')">
+        <span class="fd-label">Status</span><span class="fd-active" style="display:none"></span><span class="fd-arrow">▾</span>
+      </button>
+      <div class="fd-menu" id="fd-status-menu"></div>
+    </div>
+
+    <div class="fd-wrap" id="fd-priority">
+      <button class="fd-btn" onclick="toggleFd('fd-priority')">
+        <span class="fd-label">Priority</span><span class="fd-active" style="display:none"></span><span class="fd-arrow">▾</span>
+      </button>
+      <div class="fd-menu" id="fd-priority-menu"></div>
+    </div>
+
+    <div class="fd-wrap" id="fd-type">
+      <button class="fd-btn" onclick="toggleFd('fd-type')">
+        <span class="fd-label">Type</span><span class="fd-active" style="display:none"></span><span class="fd-arrow">▾</span>
+      </button>
+      <div class="fd-menu" id="fd-type-menu"></div>
+    </div>
+
+    <div class="fd-wrap" id="fd-area">
+      <button class="fd-btn" onclick="toggleFd('fd-area')">
+        <span class="fd-label">Area</span><span class="fd-active" style="display:none"></span><span class="fd-arrow">▾</span>
+      </button>
+      <div class="fd-menu" id="fd-area-menu"></div>
+    </div>
+
+    <button class="btn-help" onclick="openHelp()" title="Keyboard shortcuts & help">?</button>
+  </div>
+</header>
+
+<div class="summary-strip" id="summaryStrip"></div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:26px"></th>
+        <th data-col="id"     onclick="sort('id')"     style="width:46px">ID <span class="sort-icon">↕</span></th>
+        <th data-col="priority" onclick="sort('priority')" style="width:80px">Prio <span class="sort-icon">↕</span></th>
+        <th data-col="status"   onclick="sort('status')">Status <span class="sort-icon">↕</span></th>
+        <th data-col="type"   onclick="sort('type')">Type <span class="sort-icon">↕</span></th>
+        <th data-col="area"   onclick="sort('area')">Area <span class="sort-icon">↕</span></th>
+        <th data-col="title"  onclick="sort('title')">Title <span class="sort-icon">↕</span></th>
+        <th data-col="createdAt"   onclick="sort('createdAt')"   style="width:130px">Created <span class="sort-icon">↕</span></th>
+        <th data-col="completedAt" onclick="sort('completedAt')" style="width:130px">Done <span class="sort-icon">↕</span></th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Help modal -->
+<div class="modal-overlay" id="helpOverlay" onclick="closeHelp(event)">
+  <div class="modal">
+    <h2>⌨️ Keyboard Shortcuts &amp; Features</h2>
+    <table>
+      <thead><tr><th>Key / Action</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><span class="kbd">/</span></td><td>Focus search</td></tr>
+        <tr><td><span class="kbd">Esc</span></td><td>Clear search / close modal</td></tr>
+        <tr><td>Click row</td><td>Expand / collapse description</td></tr>
+        <tr><td>Click ID number</td><td>Copy issue ID to clipboard</td></tr>
+        <tr><td>URL <span class="kbd">#42</span></td><td>Open &amp; scroll to issue 42</td></tr>
+        <tr><td>Green dot ●</td><td>Completed within the last 7 days</td></tr>
+        <tr><td>Sort header</td><td>Click to sort, click again to reverse</td></tr>
+      </tbody>
+    </table>
+    <button class="modal-close" onclick="closeHelp()">Got it</button>
+  </div>
+</div>
+
+<script>
+  const tasks = window.TASKS || [];
+  let sortCol = 'id';
+  let sortDir = -1;
+  let expanded = new Set();
+  const NOW = new Date();
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  const ONE_DAY_MS    = 24 * 60 * 60 * 1000;
+
+  // Build status lookup from config
+  const STATUSES = (_cfg.statuses || []);
+  const statusById = Object.fromEntries(STATUSES.map(s => [s.id, s]));
+
+  function statusLabel(id) {
+    const s = statusById[id];
+    return s ? s.label : (id != null ? String(id) : '');
+  }
+
+  function statusBadgeStyle(id) {
+    const s = statusById[id];
+    if (!s) return 'background:var(--bg-alt);color:var(--text-muted)';
+    const bg = (_darkMode && s.bgDark) ? s.bgDark : s.bgLight;
+    const fg = (_darkMode && s.fgDark) ? s.fgDark : s.fgLight;
+    return `background:${bg};color:${fg}`;
+  }
+
+  // Populate status filter dropdown from config
+  const statusMenu = document.getElementById('fd-status-menu');
+  STATUSES.forEach(s => {
+    const lbl = document.createElement('label');
+    lbl.innerHTML = `<input type="checkbox" value="${s.id}" onchange="render()"> ${s.label}`;
+    statusMenu.appendChild(lbl);
+  });
+  const statusDiv = document.createElement('div'); statusDiv.className = 'fd-divider'; statusMenu.appendChild(statusDiv);
+  const statusBtn = document.createElement('button'); statusBtn.className = 'fd-clear'; statusBtn.textContent = 'Clear';
+  statusBtn.onclick = () => clearFd('fd-status'); statusMenu.appendChild(statusBtn);
+
+  // Build type lookup from config
+  const TYPES = (_cfg.types || []);
+  const typeById = Object.fromEntries(TYPES.map(t => [t.id, t]));
+
+  // Populate type filter dropdown from config
+  const typeMenu = document.getElementById('fd-type-menu');
+  TYPES.forEach(t => {
+    const lbl = document.createElement('label');
+    lbl.innerHTML = `<input type="checkbox" value="${t.id}" onchange="render()"> ${t.label}`;
+    typeMenu.appendChild(lbl);
+  });
+  const typeDiv = document.createElement('div'); typeDiv.className = 'fd-divider'; typeMenu.appendChild(typeDiv);
+  const typeBtn = document.createElement('button'); typeBtn.className = 'fd-clear'; typeBtn.textContent = 'Clear';
+  typeBtn.onclick = () => clearFd('fd-type'); typeMenu.appendChild(typeBtn);
+
+  // Build area lookup from config (falls back to dynamic open-string mode if areas: [])
+  const AREAS = (_cfg.areas || []);
+  const areaById    = Object.fromEntries(AREAS.map(a => [a.id, a]));
+  const areaByLabel = Object.fromEntries(AREAS.map(a => [a.label.toLowerCase(), a.id]));
+  const _areasConfigured = AREAS.length > 0;
+
+  function areaLabel(id) {
+    if (!_areasConfigured) return id != null ? String(id) : '';
+    const a = areaById[id];
+    return a ? a.label : (id != null ? String(id) : '');
+  }
+
+  function areaBadgeStyle(id) {
+    if (!_areasConfigured) return 'background:var(--area-bg);color:var(--area-fg)';
+    const a = areaById[id];
+    if (!a) return 'background:var(--area-bg);color:var(--area-fg)';
+    const bg = (_darkMode && a.bgDark) ? a.bgDark : a.bgLight;
+    const fg = (_darkMode && a.fgDark) ? a.fgDark : a.fgLight;
+    return `background:${bg};color:${fg}`;
+  }
+
+  // Populate area filter dropdown
+  const areaMenu = document.getElementById('fd-area-menu');
+  if (_areasConfigured) {
+    AREAS.forEach(a => {
+      const lbl = document.createElement('label');
+      lbl.innerHTML = `<input type="checkbox" value="${a.id}" onchange="render()"> ${a.label}`;
+      areaMenu.appendChild(lbl);
+    });
+  } else {
+    // dynamic mode: derive from data
+    const dynamicAreas = [...new Set(tasks.map(t => t.area).filter(Boolean))].sort();
+    dynamicAreas.forEach(a => {
+      const lbl = document.createElement('label');
+      lbl.innerHTML = `<input type="checkbox" value="${a}" onchange="render()"> ${a}`;
+      areaMenu.appendChild(lbl);
+    });
+  }
+  const areaDiv = document.createElement('div'); areaDiv.className = 'fd-divider'; areaMenu.appendChild(areaDiv);
+  const areaBtn = document.createElement('button'); areaBtn.className = 'fd-clear'; areaBtn.textContent = 'Clear';
+  areaBtn.onclick = () => clearFd('fd-area'); areaMenu.appendChild(areaBtn);
+
+  // Build priority lookup from config
+  const PRIORITIES = (_cfg.priorities || []);
+  const priorityById = Object.fromEntries(PRIORITIES.map(p => [p.id, p]));
+
+  function priorityLabel(id) {
+    const p = priorityById[id];
+    return p ? p.label : (id != null ? String(id) : '');
+  }
+
+  function priorityBadgeStyle(id) {
+    const p = priorityById[id];
+    if (!p) return 'background:var(--bg-alt);color:var(--text-muted)';
+    const bg = (_darkMode && p.bgDark) ? p.bgDark : p.bgLight;
+    const fg = (_darkMode && p.fgDark) ? p.fgDark : p.fgLight;
+    return `background:${bg};color:${fg}`;
+  }
+
+  // Populate priority filter dropdown from config
+  const priorityMenu = document.getElementById('fd-priority-menu');
+  PRIORITIES.forEach(p => {
+    const lbl = document.createElement('label');
+    lbl.innerHTML = `<input type="checkbox" value="${p.id}" onchange="render()"> ${p.label}`;
+    priorityMenu.appendChild(lbl);
+  });
+  const prioDiv = document.createElement('div'); prioDiv.className = 'fd-divider'; priorityMenu.appendChild(prioDiv);
+  const prioBtn = document.createElement('button'); prioBtn.className = 'fd-clear'; prioBtn.textContent = 'Clear';
+  prioBtn.onclick = () => clearFd('fd-priority'); priorityMenu.appendChild(prioBtn);
+
+  function getChecked(fdId) {
+    return [...document.querySelectorAll(`#${fdId} input:checked`)].map(el => el.value);
+  }
+
+  function toggleFd(id) {
+    const wrap = document.getElementById(id);
+    const isOpen = wrap.classList.contains('open');
+    // close all
+    document.querySelectorAll('.fd-wrap.open').forEach(el => el.classList.remove('open'));
+    if (!isOpen) wrap.classList.add('open');
+  }
+
+  function clearFd(id) {
+    document.querySelectorAll(`#${id} input[type="checkbox"]`).forEach(cb => cb.checked = false);
+    updateFdLabel(id);
+    render();
+  }
+
+  function updateFdLabel(id) {
+    const checked = getChecked(id);
+    const wrap = document.getElementById(id);
+    const badge = wrap.querySelector('.fd-active');
+    if (checked.length === 0) {
+      badge.style.display = 'none';
+    } else {
+      badge.style.display = '';
+      badge.textContent = checked.length;
+    }
+  }
+
+  // Close dropdowns when clicking outside
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.fd-wrap')) {
+      document.querySelectorAll('.fd-wrap.open').forEach(el => el.classList.remove('open'));
+    }
+  });
+
+  // Summary strip (always shows totals for all tasks, not just filtered)
+  function updateSummary() {
+    const total   = tasks.length;
+    const active  = tasks.filter(t => { const s = statusById[t.status]; return s && !s.terminal; }).length;
+    const done    = tasks.filter(t => { const s = statusById[t.status]; return s && s.terminal; }).length;
+    const recent7  = tasks.filter(t => t.completedAt && (NOW - new Date(t.completedAt)) < SEVEN_DAYS_MS).length;
+    const recent24 = tasks.filter(t => t.completedAt && (NOW - new Date(t.completedAt)) < ONE_DAY_MS).length;
+    document.getElementById('summaryStrip').innerHTML =
+      `<span>Total <b>${total}</b></span>` +
+      `<span>Active <b>${active}</b></span>` +
+      `<span>Done <b>${done}</b></span>` +
+      `<span>Completed last 7 days <b>${recent7}</b></span>` +
+      `<span>Completed last 24h <b>${recent24}</b></span>`;
+  }
+  updateSummary();
+
+  function sort(col) {
+    sortDir = (sortCol === col) ? sortDir * -1 : 1;
+    sortCol = col;
+    render();
+  }
+
+  function typeLabel(id) {
+    const t = typeById[id];
+    return t ? t.label : (id != null ? String(id) : '');
+  }
+
+  const _darkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  function typeBadgeStyle(id) {
+    const t = typeById[id];
+    if (!t) return 'background:var(--bg-alt);color:var(--text-muted)';
+    const bg = (_darkMode && t.bgDark) ? t.bgDark : t.bgLight;
+    const fg = (_darkMode && t.fgDark) ? t.fgDark : t.fgLight;
+    return `background:${bg};color:${fg}`;
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const dd   = String(d.getDate()).padStart(2, '0');
+    const mm   = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    const HH   = String(d.getHours()).padStart(2, '0');
+    const MM   = String(d.getMinutes()).padStart(2, '0');
+    return `${dd}.${mm}.${yyyy} ${HH}:${MM}`;
+  }
+
+  function isRecent(iso) {
+    return iso && (NOW - new Date(iso)) < SEVEN_DAYS_MS;
+  }
+
+  function filtered() {
+    const raw      = document.getElementById('search').value;
+    const useRegex = document.getElementById('regexToggle').checked;
+    const statuses = getChecked('fd-status');
+    const types    = getChecked('fd-type');
+    const areas    = getChecked('fd-area');
+    const prios    = getChecked('fd-priority');
+    const idFilter = parseInt(document.getElementById('filterId').value, 10);
+    // Update button badges
+    ['fd-status','fd-type','fd-area','fd-priority'].forEach(updateFdLabel);
+
+    let searchFn = null;
+    if (raw) {
+      if (useRegex) {
+        try {
+          const pat = new RegExp(raw, 'i');
+          searchFn = str => pat.test(str);
+        } catch(e) {
+          searchFn = () => false; // invalid regex — match nothing
+        }
+      } else {
+        const q = raw.toLowerCase();
+        searchFn = str => str.toLowerCase().includes(q);
+      }
+    }
+
+    return tasks.filter(t => {
+      if (!isNaN(idFilter) && t.id !== idFilter)              return false;
+      if (statuses.length && !statuses.map(Number).includes(t.status)) return false;
+      if (types.length    && !types.map(Number).includes(t.type))  return false;
+      if (areas.length    && !(_areasConfigured ? areas.map(Number).includes(t.area) : areas.includes(t.area))) return false;
+      if (prios.length    && !prios.map(Number).includes(t.priority)) return false;
+      if (searchFn && !searchFn(`${t.title} ${t.description||''} ${t.solution||''} ${t.id}`)) return false;
+      return true;
+    });
+  }
+
+  function highlight(text, query) {
+    if (!query) return escHtml(text);
+    const useRegex = document.getElementById('regexToggle').checked;
+    let pat;
+    if (useRegex) {
+      try { pat = new RegExp(query, 'gi'); } catch(e) { return escHtml(text); }
+    } else {
+      pat = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    }
+    return escHtml(text).replace(pat, m => `<mark>${m}</mark>`);
+  }
+
+  function render() {
+    const q    = document.getElementById('search').value;
+    const data = filtered();
+
+    // Sort
+    data.sort((a, b) => {
+      if (sortCol === 'id') return sortDir * (a.id - b.id);
+      if (sortCol === 'completedAt') {
+        return sortDir * (new Date(a.completedAt||0) - new Date(b.completedAt||0));
+      }
+      if (sortCol === 'createdAt') {
+        return sortDir * (new Date(a.createdAt||0) - new Date(b.createdAt||0));
+      }
+      const av = (a[sortCol]||'').toString().toLowerCase();
+      const bv = (b[sortCol]||'').toString().toLowerCase();
+      if (sortCol === 'priority') {
+        const prioOrder = Object.fromEntries(PRIORITIES.map((p, i) => [p.id, i]));
+        return sortDir * ((prioOrder[a.priority] ?? 99) - (prioOrder[b.priority] ?? 99));
+      }
+      if (sortCol === 'status') {
+        const statusOrder = Object.fromEntries(STATUSES.map((s, i) => [s.id, i]));
+        return sortDir * ((statusOrder[a.status] ?? 99) - (statusOrder[b.status] ?? 99));
+      }
+      return sortDir * av.localeCompare(bv);
+    });
+
+    // Update sort indicators
+    document.querySelectorAll('th[data-col]').forEach(th => {
+      th.classList.remove('sorted');
+      th.querySelector('.sort-icon').textContent = '↕';
+    });
+    const activeTh = document.querySelector(`th[data-col="${sortCol}"]`);
+    if (activeTh) {
+      activeTh.classList.add('sorted');
+      activeTh.querySelector('.sort-icon').textContent = sortDir === 1 ? '↑' : '↓';
+    }
+
+    const tbody = document.getElementById('tbody');
+    if (!data.length) {
+      tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div>🔍</div>No issues match the current filters.</div></td></tr>`;
+      return;
+    }
+
+    // Build rows
+    const rows = [];
+
+    data.forEach(t => {
+      const hasContent = !!(t.description || t.solution);
+      const isOpen  = expanded.has(t.id);
+      const recentDot = isRecent(t.completedAt) ? '<span class="recent-dot" title="Completed this week"></span>' : '';
+
+      rows.push(`
+        <tr class="data-row${isOpen ? ' expanded' : ''}" id="issue-${t.id}" onclick="toggle(${t.id})">
+          <td><span class="${hasContent ? 'expand-icon' : 'no-expand'}">${hasContent ? '▶' : '·'}</span></td>
+          <td class="id-cell" onclick="copyId(event, ${t.id})">${t.id}</td>
+          <td><span class="badge" style="${priorityBadgeStyle(t.priority)}">${priorityLabel(t.priority)}</span></td>
+          <td><span class="badge" style="${statusBadgeStyle(t.status)}">${statusLabel(t.status)}</span></td>
+          <td><span class="badge" style="${typeBadgeStyle(t.type)}">${typeLabel(t.type)}</span></td>
+          <td><span class="area-tag" style="${areaBadgeStyle(t.area)}">${areaLabel(t.area)||'—'}</span></td>
+          <td class="title-cell">${recentDot}${highlight(t.title, q)}</td>
+          <td style="font-size:12px;color:var(--text-muted);white-space:nowrap">${fmtDate(t.createdAt)}</td>
+          <td style="font-size:12px;color:var(--text-muted);white-space:nowrap">${fmtDate(t.completedAt)}</td>
+        </tr>
+        <tr class="desc-row${isOpen ? ' open' : ''}">
+          <td colspan="9">
+            <div class="desc-content">
+              ${t.description ? `<div class="desc-text">${highlight(t.description.trim(), q)}</div>` : ''}
+              ${t.solution ? `<div class="solution-block"><div class="solution-label">Solution</div>${highlight(t.solution.trim(), q)}</div>` : ''}
+              <div class="desc-meta">
+                ${t.createdAt    ? `<span>📅 Created: ${fmtDate(t.createdAt)}</span>` : ''}
+                ${t.completedAt  ? `<span>✅ Completed: ${fmtDate(t.completedAt)}</span>` : ''}
+              </div>
+            </div>
+          </td>
+        </tr>
+      `);
+    });
+
+    tbody.innerHTML = rows.join('');
+
+    // Scroll to anchor if present and not yet done
+    const hash = parseInt(location.hash.replace('#', ''));
+    if (hash && !window._anchorScrolled) {
+      const el = document.getElementById('issue-' + hash);
+      if (el) {
+        window._anchorScrolled = true;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }
+
+  function toggle(id) {
+    if (expanded.has(id)) {
+      expanded.delete(id);
+    } else {
+      expanded.add(id);
+      history.replaceState(null, '', '#' + id);
+    }
+    render();
+  }
+
+  function copyId(event, id) {
+    event.stopPropagation();
+    navigator.clipboard.writeText(String(id)).then(() => showToast('Copied ' + id));
+  }
+
+  function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => el.classList.remove('show'), 1800);
+  }
+
+  function openHelp()        { document.getElementById('helpOverlay').classList.add('open'); }
+  function closeHelp(e)      { if (!e || e.target === document.getElementById('helpOverlay')) document.getElementById('helpOverlay').classList.remove('open'); }
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      const overlay = document.getElementById('helpOverlay');
+      if (overlay.classList.contains('open')) { overlay.classList.remove('open'); return; }
+      const search = document.getElementById('search');
+      const filterId = document.getElementById('filterId');
+      if (search.value || filterId.value) { search.value = ''; filterId.value = ''; render(); } else { search.blur(); }
+    }
+    if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
+      e.preventDefault();
+      document.getElementById('search').focus();
+    }
+  });
+
+  // Handle URL anchor on load
+  window.addEventListener('load', () => {
+    // Set project name from config
+    const heading = document.getElementById('project-name-heading');
+    if (heading && _projectName) heading.textContent = _projectName;
+
+    const hash = parseInt(location.hash.replace('#', ''));
+    if (hash) { expanded.add(hash); }
+    render();
+  });
+
+  function escHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Initial render
+  render();
+</script>
+</body>
+</html>

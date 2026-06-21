@@ -1,0 +1,109 @@
+{
+  "schema": "1.0",
+  "updated": "2026-06-18",
+  "entries": [
+    {
+      "name": "grid",
+      "path": ".grid/system/grid",
+      "version": "0.1.0",
+      "optional": false,
+      "description": "Grid conductor — session initialization, workflow tables, collaboration model"
+    },
+    {
+      "name": "skill-index",
+      "path": ".grid/system/skill-index",
+      "version": "0.1.0",
+      "optional": false,
+      "description": "skill_cache schema and query protocol"
+    },
+    {
+      "name": "maintain-skills",
+      "path": ".grid/system/maintain-skills",
+      "version": "0.1.0",
+      "optional": false,
+      "description": "Skill maintenance rules, iso creation guide, quality checklist"
+    },
+    {
+      "name": "tron",
+      "path": ".grid/programs/tron",
+      "version": "0.1.0",
+      "optional": false,
+      "description": "Workflow guardian — approval gates, pre-commit checklist, trigger enforcement"
+    },
+    {
+      "name": "ram",
+      "path": ".grid/programs/ram",
+      "version": "0.1.0",
+      "optional": false,
+      "description": "Planning assistant — session tasks, todo scanning, sub-skill coordination"
+    },
+    {
+      "name": "recognizer",
+      "path": ".grid/programs/recognizer",
+      "version": "0.1.0",
+      "optional": false,
+      "description": "Skill scanner — project survey, skill gap discovery, proactive suggestions"
+    },
+    {
+      "name": "dumont",
+      "path": ".grid/programs/dumont",
+      "version": "0.1.0",
+      "optional": false,
+      "description": "External connector — bridge to external tools, APIs, and services"
+    },
+    {
+      "name": "anon",
+      "path": ".grid/programs/anon",
+      "version": "0.1.0",
+      "optional": false,
+      "description": "Registry and program manager — install, update, uninstall, status report"
+    },
+    {
+      "name": "able",
+      "path": ".grid/programs/able",
+      "version": "0.1.0",
+      "optional": false,
+      "description": "Session state manager — skill cache, triggers, tasks, workflow; typed APIs for all programs"
+    },
+    {
+      "name": "gjuice",
+      "path": ".grid/programs/ram/skills/gjuice",
+      "version": "0.1.0",
+      "optional": true,
+      "parent": "ram",
+      "description": "Local issue tracker — tasks, bugs, decisions across sessions"
+    },
+    {
+      "name": "git",
+      "path": ".grid/programs/dumont/skills/git",
+      "version": "0.1.0",
+      "optional": true,
+      "parent": "dumont",
+      "description": "Git history rewrite protocol, approval gates, commit message format"
+    },
+    {
+      "name": "message-pattern",
+      "path": ".grid/programs/dumont/skills/git/skills/message-pattern",
+      "version": "0.1.0",
+      "optional": true,
+      "parent": "git",
+      "description": "Commit message pattern container — holds the active style selection"
+    },
+    {
+      "name": "conventional",
+      "path": ".grid/programs/dumont/skills/git/skills/message-pattern/conventional",
+      "version": "0.1.0",
+      "optional": true,
+      "parent": "message-pattern",
+      "description": "Conventional Commits v1.0 message style"
+    },
+    {
+      "name": "grid",
+      "path": ".grid/programs/dumont/skills/git/skills/message-pattern/grid",
+      "version": "0.1.0",
+      "optional": true,
+      "parent": "message-pattern",
+      "description": "Grid house message style — compact type codes, EBNF grammar"
+    }
+  ]
+}
